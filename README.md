@@ -82,6 +82,11 @@ Export your project as a Unity package file. Submit your Unity package file and 
 - One queen produces `NestBlock`s; each block costs one-third of her max health and is placed at her current tile after ensuring it is cleared.
 - Nest block count is tracked live inside `WorldManager` to support UI display and scoring.
 
+### Tuning & Visuals
+- Use the `AntConfig` ScriptableObject (Assets/Components/Agents/AntConfig.cs, create via Assets → Create → Antymology → Ant Config) to set shared health/decay/movement/dig/share/nest values once; assign it on the `WorldManager` component (Ant Config field) to apply to all spawned ants.
+- Assign custom prefabs/materials in `WorldManager` (`Ant Prefab` for workers, optional `Queen Prefab`, `Worker Material`, `Queen Material`) to improve visuals. Fallback uses a capsule with tinting and separate worker/queen scales.
+- Quick sizing: adjust `workerScale` and `queenScale` on `WorldManager` to change the rendered size of ants without touching prefabs.
+
 ## Controls & UI
 
 - Camera: Fly-style controls auto-attach to the main camera at runtime. Use `W/A/S/D` to move horizontally, `Q/E` for vertical movement, hold `Shift` to accelerate, and hold middle mouse to look.

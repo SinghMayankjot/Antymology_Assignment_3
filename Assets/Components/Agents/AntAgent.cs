@@ -12,6 +12,9 @@ namespace Antymology.Agents
     /// </summary>
     public class AntAgent : MonoBehaviour
     {
+        [Header("Configuration")]
+        public AntConfig SharedConfig;
+
         [Header("Identity")]
         public bool IsQueen = false;
 
@@ -42,6 +45,7 @@ namespace Antymology.Agents
 
         void Start()
         {
+            ApplySharedConfig();
             _currentHealth = MaxHealth;
             _gridPosition = WorldToGrid(transform.position);
             AntColonyManager.Instance.RegisterAnt(this, _gridPosition);
@@ -248,6 +252,31 @@ namespace Antymology.Agents
         {
             AntColonyManager.Instance.UnregisterAnt(this);
             Destroy(gameObject);
+        }
+
+        #endregion
+
+        #region Config
+
+        /// <summary>
+        /// Copies values from a shared config object if one is assigned.
+        /// </summary>
+        public void ApplySharedConfig()
+        {
+            if (SharedConfig == null)
+                return;
+
+            IsQueen = SharedConfig.IsQueen;
+            MaxHealth = SharedConfig.MaxHealth;
+            HealthDecayPerSecond = SharedConfig.HealthDecayPerSecond;
+            AcidHealthMultiplier = SharedConfig.AcidHealthMultiplier;
+            MoveIntervalSeconds = SharedConfig.MoveIntervalSeconds;
+            MaxClimbHeight = SharedConfig.MaxClimbHeight;
+            DigChancePerStep = SharedConfig.DigChancePerStep;
+            ShareThreshold = SharedConfig.ShareThreshold;
+            ShareAmount = SharedConfig.ShareAmount;
+            NestCostFraction = SharedConfig.NestCostFraction;
+            NestCooldownSeconds = SharedConfig.NestCooldownSeconds;
         }
 
         #endregion

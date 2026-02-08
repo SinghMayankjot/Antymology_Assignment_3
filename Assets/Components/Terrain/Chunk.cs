@@ -112,6 +112,14 @@ namespace Antymology.Terrain
                         }
                     }
 
+            // If nothing to render, clear the mesh and collider to avoid warnings.
+            if (NumFaces == 0)
+            {
+                mesh.Clear();
+                collider.sharedMesh = null;
+                return;
+            }
+
             // Clear whatever data was in the mesh previously
             mesh.Clear();
 

@@ -20,6 +20,32 @@ namespace Antymology.Terrain
         public GameObject antPrefab;
 
         /// <summary>
+        /// Optional override prefab for the queen; falls back to antPrefab if null.
+        /// </summary>
+        public GameObject queenPrefab;
+
+        /// <summary>
+        /// Visual customization for workers.
+        /// </summary>
+        public Material workerMaterial;
+
+        /// <summary>
+        /// Visual customization for the queen.
+        /// </summary>
+        public Material queenMaterial;
+
+        /// <summary>
+        /// Shared ant tuning (applied to all spawned agents).
+        /// </summary>
+        public AntConfig antConfig;
+
+        /// <summary>
+        /// Scale applied to workers and queens.
+        /// </summary>
+        public Vector3 workerScale = new Vector3(0.35f, 0.2f, 0.35f);
+        public Vector3 queenScale = new Vector3(0.45f, 0.3f, 0.45f);
+
+        /// <summary>
         /// The material used for eech block.
         /// </summary>
         public Material blockMaterial;
@@ -99,16 +125,7 @@ namespace Antymology.Terrain
         private void GenerateAnts()
         {
             // If no prefab was wired in the scene, build a minimal runtime visual.
-            if (antPrefab == null)
-            {
-                antPrefab = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                antPrefab.name = "AntPrefab_Runtime";
-                antPrefab.transform.localScale = Vector3.one * 0.35f;
-                var rb = antPrefab.AddComponent<Rigidbody>();
-                rb.isKinematic = true;
-                var collider = antPrefab.GetComponent<Collider>();
-                collider.isTrigger = true;
-            }
+            EnsureRuntimePrefab();
 
             // Choose a surface near the centre of the map.
             Vector3Int centre = new Vector3Int(
@@ -532,12 +549,33 @@ namespace Antymology.Terrain
         }
 
         /// <summary>
+        /// Builds a runtime ant prefab if none is provided in the scene.
+        /// </summary>
+        private void EnsureRuntimePrefab()
+        {
+            if (antPrefab != null)
+                return;
+
+            antPrefab = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            antPrefab.name = "AntPrefab_Runtime";
+            antPrefab.transform.localScale = workerScale;
+            var rb = antPrefab.AddComponent<Rigidbody>();
+            rb.isKinematic = true;
+            var collider = antPrefab.GetComponent<Collider>();
+            collider.isTrigger = true;
+
+            var agent = antPrefab.AddComponent<AntAgent>();
+            agent.SharedConfig = antConfig;
+        }
+
+        /// <summary>
         /// Instantiates an ant instance and decorates it with basic visuals.
         /// </summary>
         private void SpawnAnt(bool isQueen, Vector3Int spawn)
         {
             Vector3 worldSpawn = new Vector3(spawn.x, spawn.y + 0.2f, spawn.z);
-            GameObject instance = Instantiate(antPrefab, worldSpawn, Quaternion.identity);
+            GameObject prefabToUse = isQueen && queenPrefab != null ? queenPrefab : antPrefab;
+            GameObject instance = Instantiate(prefabToUse, worldSpawn, Quaternion.identity);
 
             // Make sure there is an AntAgent component.
             AntAgent agent = instance.GetComponent<AntAgent>();
@@ -546,11 +584,21 @@ namespace Antymology.Terrain
                 agent = instance.AddComponent<AntAgent>();
             }
             agent.IsQueen = isQueen;
+            agent.SharedConfig = antConfig;
+            agent.ApplySharedConfig();
+
+            // Apply scale/material for easy visual distinction.
+            instance.transform.localScale = isQueen ? queenScale : workerScale;
 
             Renderer rend = instance.GetComponentInChildren<Renderer>() ?? instance.GetComponent<Renderer>();
             if (rend != null)
             {
-                rend.material.color = isQueen ? Color.red : Color.black;
+                if (isQueen && queenMaterial != null)
+                    rend.material = queenMaterial;
+                else if (!isQueen && workerMaterial != null)
+                    rend.material = workerMaterial;
+                else
+                    rend.material.color = isQueen ? Color.red : Color.black;
             }
 
             instance.name = isQueen ? "QueenAnt" : $"WorkerAnt_{UnityEngine.Random.Range(0, 9999):D4}";
