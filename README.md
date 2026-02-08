@@ -69,3 +69,27 @@ another approach might be to use phermone deposits (I\'ve commented how you coul
 
 ## Submission
 Export your project as a Unity package file. Submit your Unity package file and additional document using the D2L system under the corresponding entry in Assessments/Dropbox. Inlude in the message a link to your git repo where you did your work.
+
+---
+
+## Current Implementation (Feb 4, 2026)
+
+- A queen plus a small worker cohort spawn near world centre on play. A runtime fallback prefab is created if none is wired in the scene, so the simulation always runs.
+- Ant agents track health, lose it each tick (double rate on `AcidicBlock`), die at zero, and can share health with co-located ants (zero-sum transfer).
+- Mulch can be consumed only when a single ant occupies the mulch block; doing so restores that ant to full health and removes the block.
+- Ants dig non-container, non-nest blocks beneath them to open tunnels, settling onto the new surface afterwards.
+- Movement respects the max climb/drop difference of 2 vertical units; ants pick random reachable neighbours to keep things simple.
+- One queen produces `NestBlock`s; each block costs one-third of her max health and is placed at her current tile after ensuring it is cleared.
+- Nest block count is tracked live inside `WorldManager` to support UI display and scoring.
+
+## Controls & UI
+
+- Camera: Fly-style controls auto-attach to the main camera at runtime. Use `W/A/S/D` to move horizontally, `Q/E` for vertical movement, hold `Shift` to accelerate, and hold middle mouse to look.
+- HUD: A small overlay shows `Nest Blocks` and `Ants` counts. It is spawned automatically if the scene does not already include a `NestCounterUI` component.
+- Terrain editor (unchanged from starter): Number keys `1-5` choose block types; left click adds, right click removes where the cursor points.
+
+## How to Run
+
+1. Open `Assets/Scenes/SampleScene.unity` in Unity 2019+.
+2. Press Play. The world is generated, camera controls and HUD are injected automatically, and ants begin roaming/digging/building.
+3. To tweak behaviour without code changes, adjust parameters on `WorldManager` (world size/seed) and on the `AntAgent` component (health decay, dig chance, climb height, nest cooldown) on the ant prefab or runtime prefab.

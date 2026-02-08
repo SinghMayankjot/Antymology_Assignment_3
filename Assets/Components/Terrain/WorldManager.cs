@@ -1,8 +1,11 @@
-﻿using Antymology.Helpers;
+using Antymology.Agents;
+using Antymology.Helpers;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
+using Antymology.UI;
 
 namespace Antymology.Terrain
 {
@@ -40,6 +43,11 @@ namespace Antymology.Terrain
         /// Random number generator.
         /// </summary>
         private SimplexNoise SimplexNoise;
+
+        /// <summary>
+        /// Tracks how many nest blocks currently exist.
+        /// </summary>
+        public int NestBlockCount { get; private set; }
 
         #endregion
 
@@ -80,6 +88,8 @@ namespace Antymology.Terrain
             Camera.main.transform.position = new Vector3(0 / 2, Blocks.GetLength(1), 0);
             Camera.main.transform.LookAt(new Vector3(Blocks.GetLength(0), 0, Blocks.GetLength(2)));
 
+            EnsureCameraControls();
+            EnsureUiExists();
             GenerateAnts();
         }
 
@@ -88,7 +98,38 @@ namespace Antymology.Terrain
         /// </summary>
         private void GenerateAnts()
         {
-            throw new NotImplementedException();
+            // If no prefab was wired in the scene, build a minimal runtime visual.
+            if (antPrefab == null)
+            {
+                antPrefab = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                antPrefab.name = "AntPrefab_Runtime";
+                antPrefab.transform.localScale = Vector3.one * 0.35f;
+                var rb = antPrefab.AddComponent<Rigidbody>();
+                rb.isKinematic = true;
+                var collider = antPrefab.GetComponent<Collider>();
+                collider.isTrigger = true;
+            }
+
+            // Choose a surface near the centre of the map.
+            Vector3Int centre = new Vector3Int(
+                Blocks.GetLength(0) / 2,
+                Blocks.GetLength(1) / 2,
+                Blocks.GetLength(2) / 2);
+
+            if (!TryGetSurfaceAt(centre.x, centre.z, out int spawnY))
+            {
+                Debug.LogWarning("Failed to locate spawn surface for ants.");
+                return;
+            }
+
+            int workerCount = 12;
+
+            for (int i = 0; i < workerCount; i++)
+            {
+                bool isQueen = i == 0;
+                Vector3Int spawn = FindSpawnLocationAround(centre.x, centre.z, spawnY, 6);
+                SpawnAnt(isQueen, spawn);
+            }
         }
 
         #endregion
@@ -100,6 +141,12 @@ namespace Antymology.Terrain
         /// </summary>
         public AbstractBlock GetBlock(int WorldXCoordinate, int WorldYCoordinate, int WorldZCoordinate)
         {
+            if (Blocks == null)
+            {
+                Debug.LogWarning("WorldManager Blocks not initialized yet; returning air.");
+                return new AirBlock();
+            }
+
             if
             (
                 WorldXCoordinate < 0 ||
@@ -121,6 +168,12 @@ namespace Antymology.Terrain
             int ChunkXCoordinate, int ChunkYCoordinate, int ChunkZCoordinate,
             int LocalXCoordinate, int LocalYCoordinate, int LocalZCoordinate)
         {
+            if (Blocks == null)
+            {
+                Debug.LogWarning("WorldManager Blocks not initialized yet; returning air.");
+                return new AirBlock();
+            }
+
             if
             (
                 LocalXCoordinate < 0 ||
@@ -151,21 +204,33 @@ namespace Antymology.Terrain
         /// </summary>
         public void SetBlock(int WorldXCoordinate, int WorldYCoordinate, int WorldZCoordinate, AbstractBlock toSet)
         {
+            if (Blocks == null)
+            {
+                Debug.LogWarning("WorldManager Blocks not initialized yet; ignoring SetBlock call.");
+                return;
+            }
+
             if
             (
                 WorldXCoordinate < 0 ||
                 WorldYCoordinate < 0 ||
                 WorldZCoordinate < 0 ||
-                WorldXCoordinate > Blocks.GetLength(0) ||
-                WorldYCoordinate > Blocks.GetLength(1) ||
-                WorldZCoordinate > Blocks.GetLength(2)
+                WorldXCoordinate >= Blocks.GetLength(0) ||
+                WorldYCoordinate >= Blocks.GetLength(1) ||
+                WorldZCoordinate >= Blocks.GetLength(2)
             )
             {
                 Debug.Log("Attempted to set a block which didn't exist");
                 return;
             }
 
+            bool oldIsNest = Blocks[WorldXCoordinate, WorldYCoordinate, WorldZCoordinate] is NestBlock;
+            bool newIsNest = toSet is NestBlock;
+
             Blocks[WorldXCoordinate, WorldYCoordinate, WorldZCoordinate] = toSet;
+
+            if (newIsNest && !oldIsNest) NestBlockCount++;
+            if (oldIsNest && !newIsNest) NestBlockCount = Mathf.Max(0, NestBlockCount - 1);
 
             SetChunkContainingBlockToUpdate
             (
@@ -183,6 +248,12 @@ namespace Antymology.Terrain
             int LocalXCoordinate, int LocalYCoordinate, int LocalZCoordinate,
             AbstractBlock toSet)
         {
+            if (Blocks == null)
+            {
+                Debug.LogWarning("WorldManager Blocks not initialized yet; ignoring SetBlock call.");
+                return;
+            }
+
             if
             (
                 LocalXCoordinate < 0 ||
@@ -202,12 +273,23 @@ namespace Antymology.Terrain
                 Debug.Log("Attempted to set a block which didn't exist");
                 return;
             }
+
+            bool oldIsNest = Blocks
+            [
+                ChunkXCoordinate * LocalXCoordinate,
+                ChunkYCoordinate * LocalYCoordinate,
+                ChunkZCoordinate * LocalZCoordinate
+            ] is NestBlock;
+            bool newIsNest = toSet is NestBlock;
             Blocks
             [
                 ChunkXCoordinate * LocalXCoordinate,
                 ChunkYCoordinate * LocalYCoordinate,
                 ChunkZCoordinate * LocalZCoordinate
             ] = toSet;
+
+            if (newIsNest && !oldIsNest) NestBlockCount++;
+            if (oldIsNest && !newIsNest) NestBlockCount = Mathf.Max(0, NestBlockCount - 1);
 
             SetChunkContainingBlockToUpdate
             (
@@ -231,6 +313,71 @@ namespace Antymology.Terrain
             GeneratePreliminaryWorld();
             GenerateAcidicRegions();
             GenerateSphericalContainers();
+            RecountNestBlocks();
+        }
+
+        /// <summary>
+        /// Full pass over the Blocks array to refresh the nest block count.
+        /// </summary>
+        private void RecountNestBlocks()
+        {
+            int count = 0;
+            for (int x = 0; x < Blocks.GetLength(0); x++)
+                for (int y = 0; y < Blocks.GetLength(1); y++)
+                    for (int z = 0; z < Blocks.GetLength(2); z++)
+                    {
+                        if (Blocks[x, y, z] is NestBlock)
+                            count++;
+                    }
+
+            NestBlockCount = count;
+        }
+
+        /// <summary>
+        /// Returns the world dimensions as a Vector3Int.
+        /// </summary>
+        public Vector3Int WorldSize()
+        {
+            return new Vector3Int(Blocks.GetLength(0), Blocks.GetLength(1), Blocks.GetLength(2));
+        }
+
+        /// <summary>
+        /// Attempts to find the top-most non-air block at a given x/z column.
+        /// </summary>
+        public bool TryGetSurfaceAt(int worldX, int worldZ, out int surfaceY)
+        {
+            surfaceY = -1;
+
+            if
+            (
+                worldX < 0 ||
+                worldZ < 0 ||
+                worldX >= Blocks.GetLength(0) ||
+                worldZ >= Blocks.GetLength(2)
+            )
+                return false;
+
+            for (int y = Blocks.GetLength(1) - 1; y >= 0; y--)
+            {
+                if (!(GetBlock(worldX, y, worldZ) is AirBlock))
+                {
+                    surfaceY = y;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// True if the coordinates fall inside the world array.
+        /// </summary>
+        public bool IsInsideBounds(int worldX, int worldY, int worldZ)
+        {
+            return
+                worldX >= 0 && worldX < Blocks.GetLength(0) &&
+                worldY >= 0 && worldY < Blocks.GetLength(1) &&
+                worldZ >= 0 && worldZ < Blocks.GetLength(2);
         }
 
         /// <summary>
@@ -367,6 +514,96 @@ namespace Antymology.Terrain
         }
 
         /// <summary>
+        /// Picks a nearby surface location within a radius of the supplied column.
+        /// </summary>
+        private Vector3Int FindSpawnLocationAround(int x, int z, int fallbackY, int radius)
+        {
+            for (int attempt = 0; attempt < 50; attempt++)
+            {
+                int candidateX = Mathf.Clamp(x + RNG.Next(-radius, radius + 1), 1, Blocks.GetLength(0) - 2);
+                int candidateZ = Mathf.Clamp(z + RNG.Next(-radius, radius + 1), 1, Blocks.GetLength(2) - 2);
+                if (TryGetSurfaceAt(candidateX, candidateZ, out int surfaceY))
+                {
+                    return new Vector3Int(candidateX, surfaceY, candidateZ);
+                }
+            }
+
+            return new Vector3Int(x, fallbackY, z);
+        }
+
+        /// <summary>
+        /// Instantiates an ant instance and decorates it with basic visuals.
+        /// </summary>
+        private void SpawnAnt(bool isQueen, Vector3Int spawn)
+        {
+            Vector3 worldSpawn = new Vector3(spawn.x, spawn.y + 0.2f, spawn.z);
+            GameObject instance = Instantiate(antPrefab, worldSpawn, Quaternion.identity);
+
+            // Make sure there is an AntAgent component.
+            AntAgent agent = instance.GetComponent<AntAgent>();
+            if (agent == null)
+            {
+                agent = instance.AddComponent<AntAgent>();
+            }
+            agent.IsQueen = isQueen;
+
+            Renderer rend = instance.GetComponentInChildren<Renderer>() ?? instance.GetComponent<Renderer>();
+            if (rend != null)
+            {
+                rend.material.color = isQueen ? Color.red : Color.black;
+            }
+
+            instance.name = isQueen ? "QueenAnt" : $"WorkerAnt_{UnityEngine.Random.Range(0, 9999):D4}";
+        }
+
+        /// <summary>
+        /// Ensures there is a simple HUD with the nest counter in the scene.
+        /// If the level already contains a NestCounterUI component, this does nothing.
+        /// </summary>
+        private void EnsureUiExists()
+        {
+            if (FindObjectOfType<NestCounterUI>() != null)
+                return;
+
+            GameObject canvasObj = new GameObject("HUD_Canvas");
+            Canvas canvas = canvasObj.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvasObj.AddComponent<CanvasScaler>();
+            canvasObj.AddComponent<GraphicRaycaster>();
+
+            GameObject textObj = new GameObject("NestCounter");
+            textObj.transform.SetParent(canvasObj.transform, false);
+
+            var rect = textObj.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0, 1);
+            rect.anchorMax = new Vector2(0, 1);
+            rect.pivot = new Vector2(0, 1);
+            rect.anchoredPosition = new Vector2(15, -15);
+
+            Text text = textObj.AddComponent<Text>();
+            // Unity 2019+ no longer exposes Arial as a built‑in; LegacyRuntime is the supported fallback.
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.fontSize = 18;
+            text.color = Color.white;
+            text.alignment = TextAnchor.UpperLeft;
+
+            NestCounterUI counter = textObj.AddComponent<NestCounterUI>();
+            counter.counterText = text;
+        }
+
+        /// <summary>
+        /// Makes sure the scene camera can be navigated in play mode.
+        /// </summary>
+        private void EnsureCameraControls()
+        {
+            Camera cam = Camera.main;
+            if (cam != null && cam.GetComponent<FlyCamera>() == null)
+            {
+                cam.gameObject.AddComponent<FlyCamera>();
+            }
+        }
+
+        /// <summary>
         /// Given a world coordinate, tells the chunk holding that coordinate to update.
         /// Also tells all 4 neighbours to update (as an altered block might exist on the
         /// edge of a chunk).
@@ -395,7 +632,7 @@ namespace Antymology.Terrain
 
             if (updateZ - 1 >= 0)
                 Chunks[updateX, updateY, updateZ - 1].updateNeeded = true;
-            if (updateX + 1 < Chunks.GetLength(2))
+            if (updateZ + 1 < Chunks.GetLength(2))
                 Chunks[updateX, updateY, updateZ + 1].updateNeeded = true;
         }
 
