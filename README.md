@@ -96,7 +96,7 @@ Export your project as a Unity package file. Submit your Unity package file and 
 - HUD: A small overlay shows `Nest Blocks` and `Ants` counts. It is spawned automatically if the scene does not already include a `NestCounterUI` component.
 - Terrain editor (unchanged from starter): Number keys `1-5` choose block types; left click adds, right click removes where the cursor points.
 
-## A+ Checklist
+## Checklist (Needed before Final submittion)
 - Unity 6000.3.* (Hub target set) and README documents how to run the scene, with images/gifs of ants digging/building and the HUD visible.
 - Queen visually distinct (material/scale/tint) and only one queen per generation; no new ants spawned mid-evaluation.
 - Health rules: decay each tick, death at 0, double decay on acid, mulch restores health only when uncontested, digging blocked on ContainerBlock, move height delta ≤2, health sharing zero-sum.
