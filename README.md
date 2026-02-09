@@ -86,6 +86,7 @@ Export your project as a Unity package file. Submit your Unity package file and 
 - Use the `AntConfig` ScriptableObject (Assets/Components/Agents/AntConfig.cs, create via Assets → Create → Antymology → Ant Config) to set shared health/decay/movement/dig/share/nest values once; assign it on the `WorldManager` component (Ant Config field) to apply to all spawned ants.
 - Assign custom prefabs/materials in `WorldManager` (`Ant Prefab` for workers, optional `Queen Prefab`, `Worker Material`, `Queen Material`) to improve visuals. Fallback uses a capsule with tinting and separate worker/queen scales.
 - Quick sizing: adjust `workerScale` and `queenScale` on `WorldManager` to change the rendered size of ants without touching prefabs.
+- Early evolutionary loop: add `EvolutionManager` (Assets/Components/Agents/Evolution/EvolutionManager.cs) to the scene and enable `autoRun` to run timed generations. Each generation uses a mutated `AntGenome` (behaviour knobs); fitness = nest blocks built during the window. Set `evaluationDurationSeconds`, `populationSize`, `eliteCount`, and `mutationStrength`. If `regenerateTerrainEachGeneration` is on, the world rebuilds between generations.
 
 ## Controls & UI
 

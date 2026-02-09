@@ -1,4 +1,5 @@
 using Antymology.Terrain;
+using Antymology.Agents.Evolution;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -14,6 +15,7 @@ namespace Antymology.Agents
     {
         [Header("Configuration")]
         public AntConfig SharedConfig;
+        public AntGenome GenomeOverride;
 
         [Header("Identity")]
         public bool IsQueen = false;
@@ -46,6 +48,11 @@ namespace Antymology.Agents
         void Start()
         {
             ApplySharedConfig();
+            if (GenomeOverride == null && EvolutionManager.Instance != null)
+            {
+                GenomeOverride = EvolutionManager.Instance.CurrentGenome;
+            }
+            ApplyGenome();
             _currentHealth = MaxHealth;
             _gridPosition = WorldToGrid(transform.position);
             AntColonyManager.Instance.RegisterAnt(this, _gridPosition);
@@ -277,6 +284,26 @@ namespace Antymology.Agents
             ShareAmount = SharedConfig.ShareAmount;
             NestCostFraction = SharedConfig.NestCostFraction;
             NestCooldownSeconds = SharedConfig.NestCooldownSeconds;
+        }
+
+        /// <summary>
+        /// Applies genome overrides if available.
+        /// </summary>
+        public void ApplyGenome()
+        {
+            if (GenomeOverride == null)
+                return;
+
+            MoveIntervalSeconds = GenomeOverride.MoveIntervalSeconds;
+            MaxClimbHeight = GenomeOverride.MaxClimbHeight;
+            DigChancePerStep = GenomeOverride.DigChancePerStep;
+            ShareThreshold = GenomeOverride.ShareThreshold;
+            ShareAmount = GenomeOverride.ShareAmount;
+            NestCostFraction = GenomeOverride.NestCostFraction;
+            NestCooldownSeconds = GenomeOverride.NestCooldownSeconds;
+            HealthDecayPerSecond = GenomeOverride.HealthDecayPerSecond;
+            AcidHealthMultiplier = GenomeOverride.AcidHealthMultiplier;
+            MaxHealth = GenomeOverride.MaxHealth;
         }
 
         #endregion

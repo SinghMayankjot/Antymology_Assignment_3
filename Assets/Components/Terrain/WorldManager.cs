@@ -75,6 +75,14 @@ namespace Antymology.Terrain
         /// </summary>
         public int NestBlockCount { get; private set; }
 
+        /// <summary>
+        /// Clears the tracked nest block count (used between evaluation cycles).
+        /// </summary>
+        public void ClearNestCount()
+        {
+            NestBlockCount = 0;
+        }
+
         #endregion
 
         #region Initialization
@@ -116,13 +124,13 @@ namespace Antymology.Terrain
 
             EnsureCameraControls();
             EnsureUiExists();
-            GenerateAnts();
+            SpawnAnts();
         }
 
         /// <summary>
-        /// TO BE IMPLEMENTED BY YOU
+        /// Spawns the initial set of ants for the current world.
         /// </summary>
-        private void GenerateAnts()
+        public void SpawnAnts(AntGenome genomeOverride = null)
         {
             // If no prefab was wired in the scene, build a minimal runtime visual.
             EnsureRuntimePrefab();
@@ -145,7 +153,7 @@ namespace Antymology.Terrain
             {
                 bool isQueen = i == 0;
                 Vector3Int spawn = FindSpawnLocationAround(centre.x, centre.z, spawnY, 6);
-                SpawnAnt(isQueen, spawn);
+                SpawnAnt(isQueen, spawn, genomeOverride);
             }
         }
 
@@ -571,7 +579,7 @@ namespace Antymology.Terrain
         /// <summary>
         /// Instantiates an ant instance and decorates it with basic visuals.
         /// </summary>
-        private void SpawnAnt(bool isQueen, Vector3Int spawn)
+        private void SpawnAnt(bool isQueen, Vector3Int spawn, AntGenome genomeOverride = null)
         {
             Vector3 worldSpawn = new Vector3(spawn.x, spawn.y + 0.2f, spawn.z);
             GameObject prefabToUse = isQueen && queenPrefab != null ? queenPrefab : antPrefab;
@@ -585,7 +593,9 @@ namespace Antymology.Terrain
             }
             agent.IsQueen = isQueen;
             agent.SharedConfig = antConfig;
+            agent.GenomeOverride = genomeOverride;
             agent.ApplySharedConfig();
+            agent.ApplyGenome();
 
             // Apply scale/material for easy visual distinction.
             instance.transform.localScale = isQueen ? queenScale : workerScale;
@@ -602,6 +612,38 @@ namespace Antymology.Terrain
             }
 
             instance.name = isQueen ? "QueenAnt" : $"WorkerAnt_{UnityEngine.Random.Range(0, 9999):D4}";
+        }
+
+        /// <summary>
+        /// Regenerates the world data and refreshes chunk meshes. Useful between evaluation cycles.
+        /// </summary>
+        public void RegenerateWorld(int? seedOverride = null)
+        {
+            int seedToUse = seedOverride ?? ConfigurationManager.Instance.Seed;
+            RNG = new System.Random(seedToUse);
+            SimplexNoise = new SimplexNoise(seedToUse);
+
+            Blocks = new AbstractBlock[
+                ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter,
+                ConfigurationManager.Instance.World_Height * ConfigurationManager.Instance.Chunk_Diameter,
+                ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter];
+
+            GenerateData();
+            NestBlockCount = 0;
+
+            // Force chunk meshes to refresh against the new block data.
+            if (Chunks != null && Chunks.Length > 0)
+            {
+                for (int x = 0; x < Chunks.GetLength(0); x++)
+                    for (int z = 0; z < Chunks.GetLength(2); z++)
+                        for (int y = 0; y < Chunks.GetLength(1); y++)
+                        {
+                            if (Chunks[x, y, z] == null)
+                                continue;
+                            Chunks[x, y, z].updateNeeded = true;
+                            Chunks[x, y, z].GenerateMesh();
+                        }
+            }
         }
 
         /// <summary>

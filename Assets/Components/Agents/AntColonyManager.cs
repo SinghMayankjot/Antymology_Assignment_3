@@ -105,6 +105,23 @@ namespace Antymology.Agents
         }
 
         /// <summary>
+        /// Destroys all tracked ants and clears internal state.
+        /// </summary>
+        public void DestroyAllAnts()
+        {
+            foreach (var ant in ants.ToArray())
+            {
+                if (ant != null)
+                {
+                    Destroy(ant.gameObject);
+                }
+            }
+            ants.Clear();
+            occupancy.Clear();
+            Queen = null;
+        }
+
+        /// <summary>
         /// Exposes the currently tracked ants.
         /// </summary>
         public IReadOnlyList<AntAgent> Ants => ants;
