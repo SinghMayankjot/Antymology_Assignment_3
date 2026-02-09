@@ -19,7 +19,7 @@ namespace Antymology.Agents.Evolution
         [Header("Evaluation")]
         public float evaluationDurationSeconds = 60f;
         public bool regenerateTerrainEachGeneration = true;
-        public bool autoRun = false;
+        public bool autoRun = true;
 
         /// <summary>
         /// The genome currently applied to spawned ants.

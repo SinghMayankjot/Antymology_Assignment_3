@@ -1,4 +1,5 @@
 using Antymology.Agents;
+using Antymology.Agents.Evolution;
 using Antymology.Helpers;
 using System;
 using System.Collections;
@@ -124,6 +125,7 @@ namespace Antymology.Terrain
 
             EnsureCameraControls();
             EnsureUiExists();
+            EnsureEvolutionManager();
             SpawnAnts();
         }
 
@@ -561,19 +563,29 @@ namespace Antymology.Terrain
         /// </summary>
         private void EnsureRuntimePrefab()
         {
-            if (antPrefab != null)
-                return;
+            // Try to load stylized defaults if no prefab is assigned.
+            if (antPrefab == null)
+            {
+                antPrefab = Resources.Load<GameObject>("AntPrefabs/AntWorker");
+            }
+            if (queenPrefab == null)
+            {
+                queenPrefab = Resources.Load<GameObject>("AntPrefabs/AntQueen");
+            }
 
-            antPrefab = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            antPrefab.name = "AntPrefab_Runtime";
-            antPrefab.transform.localScale = workerScale;
-            var rb = antPrefab.AddComponent<Rigidbody>();
-            rb.isKinematic = true;
-            var collider = antPrefab.GetComponent<Collider>();
-            collider.isTrigger = true;
+            if (antPrefab == null)
+            {
+                antPrefab = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                antPrefab.name = "AntPrefab_Runtime";
+                antPrefab.transform.localScale = workerScale;
+                var rb = antPrefab.AddComponent<Rigidbody>();
+                rb.isKinematic = true;
+                var collider = antPrefab.GetComponent<Collider>();
+                collider.isTrigger = true;
 
-            var agent = antPrefab.AddComponent<AntAgent>();
-            agent.SharedConfig = antConfig;
+                var agent = antPrefab.AddComponent<AntAgent>();
+                agent.SharedConfig = antConfig;
+            }
         }
 
         /// <summary>
@@ -679,6 +691,18 @@ namespace Antymology.Terrain
 
             NestCounterUI counter = textObj.AddComponent<NestCounterUI>();
             counter.counterText = text;
+        }
+
+        /// <summary>
+        /// Ensures an EvolutionManager exists so auto-run generations are available by default.
+        /// </summary>
+        private void EnsureEvolutionManager()
+        {
+            if (EvolutionManager.Instance != null)
+                return;
+
+            GameObject evoObj = new GameObject("EvolutionManager");
+            evoObj.AddComponent<EvolutionManager>();
         }
 
         /// <summary>

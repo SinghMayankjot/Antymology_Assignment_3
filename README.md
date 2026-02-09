@@ -86,13 +86,26 @@ Export your project as a Unity package file. Submit your Unity package file and 
 - Use the `AntConfig` ScriptableObject (Assets/Components/Agents/AntConfig.cs, create via Assets → Create → Antymology → Ant Config) to set shared health/decay/movement/dig/share/nest values once; assign it on the `WorldManager` component (Ant Config field) to apply to all spawned ants.
 - Assign custom prefabs/materials in `WorldManager` (`Ant Prefab` for workers, optional `Queen Prefab`, `Worker Material`, `Queen Material`) to improve visuals. Fallback uses a capsule with tinting and separate worker/queen scales.
 - Quick sizing: adjust `workerScale` and `queenScale` on `WorldManager` to change the rendered size of ants without touching prefabs.
-- Early evolutionary loop: add `EvolutionManager` (Assets/Components/Agents/Evolution/EvolutionManager.cs) to the scene and enable `autoRun` to run timed generations. Each generation uses a mutated `AntGenome` (behaviour knobs); fitness = nest blocks built during the window. Set `evaluationDurationSeconds`, `populationSize`, `eliteCount`, and `mutationStrength`. If `regenerateTerrainEachGeneration` is on, the world rebuilds between generations.
+- Early evolutionary loop: `EvolutionManager` (auto-created by WorldManager if missing) runs timed generations when `autoRun` is true. Each generation uses a mutated `AntGenome` (behaviour knobs); fitness = nest blocks built during the window. Set `evaluationDurationSeconds`, `populationSize`, `eliteCount`, and `mutationStrength`. If `regenerateTerrainEachGeneration` is on, the world rebuilds between generations.
+- Visuals: default worker/queen prefabs auto-load from `Assets/Resources/AntPrefabs/AntWorker.prefab` and `AntQueen.prefab` (stylized ant model). Set your own via `WorldManager` fields to override; queen and worker scales remain separate.
+- Pheromones: ants deposit pheromones on blocks as they move; pheromones decay/diffuse to neighbours. Movement is biased toward higher pheromone tiles, and queens avoid placing nests deep underground or without air above, so nests form near the surface where pheromone trails lead.
 
 ## Controls & UI
 
 - Camera: Fly-style controls auto-attach to the main camera at runtime. Use `W/A/S/D` to move horizontally, `Q/E` for vertical movement, hold `Shift` to accelerate, and hold middle mouse to look.
 - HUD: A small overlay shows `Nest Blocks` and `Ants` counts. It is spawned automatically if the scene does not already include a `NestCounterUI` component.
 - Terrain editor (unchanged from starter): Number keys `1-5` choose block types; left click adds, right click removes where the cursor points.
+
+## A+ Checklist
+- Unity 6000.3.* (Hub target set) and README documents how to run the scene, with images/gifs of ants digging/building and the HUD visible.
+- Queen visually distinct (material/scale/tint) and only one queen per generation; no new ants spawned mid-evaluation.
+- Health rules: decay each tick, death at 0, double decay on acid, mulch restores health only when uncontested, digging blocked on ContainerBlock, move height delta ≤2, health sharing zero-sum.
+- UI shows nest block count; camera usable in play mode.
+- Evolutionary behaviour visible: EvolutionManager in scene (auto-created), `autoRun` true, reasonable `evaluationDurationSeconds` (e.g., 60s) to demonstrate generations.
+
+## Capturing Screenshots/GIFs
+- Screenshots: In Play mode, frame the action with the fly camera; press `Print Screen` or use `Game` view’s resolution dropdown → `Maximize On Play` for clarity. Save as PNGs in `Images/` and link in README with relative paths.
+- GIFs/video: Use Unity Recorder (`Package Manager` → add `Unity Recorder`; menu `Window` → `General` → `Recorder`). Create a GameView recording, set duration (e.g., 10–15s) and output path under `Images/`. Alternatively use OBS with a cropped Game view. Convert MP4 to GIF with ffmpeg if needed (`ffmpeg -i input.mp4 -vf fps=12,scale=640:-1 -loop 0 output.gif`).
 
 ## How to Run
 

@@ -29,4 +29,9 @@ public abstract class AbstractBlock
     /// The world z coordinate of this block.
     /// </summary>
     public int worldZCoordinate;
+
+    /// <summary>
+    /// Simple pheromone concentration stored on this block.
+    /// </summary>
+    public float pheromone;
 }

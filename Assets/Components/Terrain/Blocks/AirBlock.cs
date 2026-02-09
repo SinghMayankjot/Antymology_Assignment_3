@@ -21,8 +21,7 @@ namespace Antymology.Terrain
         private static bool _isVisible = false;
 
         /// <summary>
-        /// A dictionary representing the phermone deposits in the air. Each type of phermone gets it's own byte key, and each phermone type has a concentration.
-        /// THIS CURRENTLY ONLY EXISTS AS A WAY OF SHOWING YOU HOW YOU CAN MANIPULATE THE BLOCKS.
+        /// Simple pheromone reservoir used by ants.
         /// </summary>
         private Dictionary<byte, double> phermoneDeposits;
 
@@ -52,7 +51,24 @@ namespace Antymology.Terrain
         /// <param name="neighbours"></param>
         public void Diffuse(AbstractBlock[] neighbours)
         {
-            throw new NotImplementedException();
+            // Simple diffusion: push a small portion to neighbouring blocks, then decay this block.
+            float share = pheromone;
+            if (share <= 0f) return;
+
+            float give = share * 0.1f;
+            int count = 0;
+            foreach (var n in neighbours)
+            {
+                if (n == null) continue;
+                n.pheromone += give;
+                count++;
+            }
+
+            if (count > 0)
+                pheromone -= give * count;
+
+            // Passive decay
+            pheromone = Mathf.Max(0, pheromone * 0.98f);
         }
 
         #endregion

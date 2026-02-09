@@ -87,6 +87,9 @@ namespace Antymology.Agents
             _gridPosition = WorldToGrid(transform.position);
             AntColonyManager.Instance.UpdateAntPosition(this, _gridPosition);
 
+            DepositPheromone(IsQueen ? 2f : 1f);
+            DecayAndDiffuse();
+
             // 1) Eat mulch if available and uncontested.
             if (TryConsumeMulch())
             {
@@ -173,6 +176,9 @@ namespace Antymology.Agents
         private void TryRandomMove()
         {
             List<Vector3Int> neighbours = new List<Vector3Int>();
+            List<Vector3Int> higherNeighbours = new List<Vector3Int>();
+            float bestPheromone = float.MinValue;
+            Vector3Int bestPheromoneTarget = Vector3Int.zero;
             Vector3Int[] offsets = new[]
             {
                 new Vector3Int(1,0,0),
@@ -194,13 +200,45 @@ namespace Antymology.Agents
                 if (surfaceBlock is ContainerBlock)
                     continue;
 
-                neighbours.Add(new Vector3Int(candidateColumn.x, surfaceY, candidateColumn.z));
+                var target = new Vector3Int(candidateColumn.x, surfaceY, candidateColumn.z);
+                neighbours.Add(target);
+
+                float pher = GetPheromone(target);
+                if (pher > bestPheromone)
+                {
+                    bestPheromone = pher;
+                    bestPheromoneTarget = target;
+                }
+
+                // Track options that bring us closer to the surface if we are underground.
+                if (WorldManager.Instance.TryGetSurfaceAt(_gridPosition.x, _gridPosition.z, out int currentSurfaceY))
+                {
+                    if (_gridPosition.y < currentSurfaceY - 1 && surfaceY >= _gridPosition.y)
+                    {
+                        higherNeighbours.Add(target);
+                    }
+                }
             }
 
             if (neighbours.Count == 0)
                 return;
 
-            Vector3Int chosen = neighbours[Random.Range(0, neighbours.Count)];
+            // Prefer climbing toward the surface if we are buried.
+            Vector3Int chosen;
+            if (higherNeighbours.Count > 0)
+            {
+                // pick the highest option to exit tunnels.
+                higherNeighbours.Sort((a, b) => b.y.CompareTo(a.y));
+                chosen = higherNeighbours[0];
+            }
+            else if (bestPheromone > 0)
+            {
+                chosen = bestPheromoneTarget;
+            }
+            else
+            {
+                chosen = neighbours[Random.Range(0, neighbours.Count)];
+            }
             MoveTo(chosen);
         }
 
@@ -217,6 +255,17 @@ namespace Antymology.Agents
 
             // Queens prefer empty or dug-out tiles.
             if (block is ContainerBlock)
+                return;
+
+            // Avoid building deeply buried nests; stay near the column surface.
+            if (WorldManager.Instance.TryGetSurfaceAt(_gridPosition.x, _gridPosition.z, out int surfaceY))
+            {
+                if (_gridPosition.y < surfaceY - 1)
+                    return;
+            }
+
+            // Require open space above to prevent entombed nests.
+            if (!(WorldManager.Instance.GetBlock(_gridPosition.x, _gridPosition.y + 1, _gridPosition.z) is AirBlock))
                 return;
 
             if (!(block is AirBlock))
@@ -253,6 +302,43 @@ namespace Antymology.Agents
         private void ReceiveHealth(float amount)
         {
             _currentHealth = Mathf.Min(MaxHealth, _currentHealth + amount);
+        }
+
+        private void DepositPheromone(float amount)
+        {
+            AbstractBlock block = WorldManager.Instance.GetBlock(_gridPosition.x, _gridPosition.y, _gridPosition.z);
+            block.pheromone = Mathf.Min(block.pheromone + amount, 50f);
+        }
+
+        private void DecayAndDiffuse()
+        {
+            AbstractBlock block = WorldManager.Instance.GetBlock(_gridPosition.x, _gridPosition.y, _gridPosition.z);
+            block.pheromone = Mathf.Max(0, block.pheromone * 0.97f);
+
+            // Push a fraction to neighbours for a simple gradient.
+            Vector3Int[] offsets = new[]
+            {
+                new Vector3Int(1,0,0),
+                new Vector3Int(-1,0,0),
+                new Vector3Int(0,1,0),
+                new Vector3Int(0,-1,0),
+                new Vector3Int(0,0,1),
+                new Vector3Int(0,0,-1)
+            };
+            float share = block.pheromone * 0.05f;
+            if (share <= 0) return;
+            foreach (var o in offsets)
+            {
+                var pos = _gridPosition + o;
+                AbstractBlock n = WorldManager.Instance.GetBlock(pos.x, pos.y, pos.z);
+                n.pheromone += share;
+            }
+            block.pheromone = Mathf.Max(0, block.pheromone - share * offsets.Length);
+        }
+
+        private float GetPheromone(Vector3Int position)
+        {
+            return WorldManager.Instance.GetBlock(position.x, position.y, position.z).pheromone;
         }
 
         private void Die()
